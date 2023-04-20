@@ -22,22 +22,41 @@ public class BankSimulation
 
     protected void HandleArrival(Customer customer)
     {
-
+        waitingCustomers.Enqueue(customer);
+        TryToMoveCustomerFromLineToTeller();
+        EnqueueNextArrival();
     }
 
     protected void HandleDeparture(Customer customer)
     {
-
+        AvailableTellers++;
+        TryToMoveCustomerFromLineToTeller();
     }
 
     private void EnqueueNextArrival()
     {
+        if (customerSource.HasNext)
+        {
+            Customer nextCustomer = customerSource.Next(CurrentTime);
 
+            if (nextCustomer.Arrival < ClosingTime)
+            {
+                pendingEventsByTimestamp.Enqueue(() => HandleArrival(nextCustomer), nextCustomer.Arrival);
+            }
+        }
     }
 
     private void TryToMoveCustomerFromLineToTeller()
     {
+        if (waitingCustomers.Count > 0 && AvailableTellers > 0)
+        {
+            Customer customer = waitingCustomers.Dequeue();
+            TimeSpan timeSpentInLine = CurrentTime - customer.Arrival;
+            MaxWaitTime = TimeSpan.FromTicks(Math.Max(MaxWaitTime.Ticks, timeSpentInLine.Ticks));
+            AvailableTellers--;
 
+            pendingEventsByTimestamp.Enqueue(() => HandleDeparture(customer), CurrentTime + customer.HelpNeeded);
+        }
     }
 
     public bool Step()
